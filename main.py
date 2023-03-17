@@ -6,9 +6,12 @@ import logging
 import os
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from dotenv import load_dotenv
+from random import randint
+
 
 load_dotenv()
 
@@ -22,10 +25,15 @@ class EwonAccount:
 
     options = Options()
     options.add_argument('--headless')
+    options.add_argument('log-level=3')
+    service = Service(executable_path='chromedriver_linux64/chromedriver')
 
     def __init__(self, account_info: list):
         self.account_info = account_info
-        self.driver = webdriver.Chrome(options=self.options)
+        self.driver = webdriver.Chrome(
+            options=self.options,
+            service=self.service,
+        )
 
     def login(self):
         self.driver.get(os.environ.get('DRIVER_GET_URL'))
@@ -100,7 +108,7 @@ def main():
 
             status = VPN.get_status()
             print(f'{status[0]} - {status[1]}')
-            time.sleep(180)
+            time.sleep(randint(111, 312))
 
         except Exception as e:
             logging.exception(e)
