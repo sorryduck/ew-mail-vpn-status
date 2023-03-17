@@ -4,6 +4,7 @@ import json
 import time
 import logging
 import os
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -102,7 +103,7 @@ def main():
                 inform_status(VPN.get_status())
 
             status = VPN.get_status()
-            print(f'{status[0]} - {status[1]}')
+            print(f'[{datetime.now()}] {status[0]}: {status[1]}')
             time.sleep(randint(111, 312))
 
         except Exception as e:
