@@ -26,7 +26,7 @@ class EwonAccount:
     options = Options()
     options.add_argument('--headless')
     options.add_argument('log-level=3')
-    service = Service(executable_path='chromedriver_linux64/chromedriver')
+    service = Service(executable_path='/chromedriver_linux64/chromedriver')
 
     def __init__(self, account_info: list):
         self.account_info = account_info
