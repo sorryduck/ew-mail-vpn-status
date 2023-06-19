@@ -23,18 +23,20 @@ class EwonAccount:
         'password',
     ]
 
-    options = Options()
-    options.add_argument('--headless')
-    options.add_argument('log-level=3')
-
     def __init__(self, account_info: list):
         self.account_info = account_info
-        self.driver = webdriver.Chrome(options=self.options)
+
+        self.options = Options()
+        self.options.add_argument('--headless')
+        self.options.add_argument('log-level=3')
+
+        self.driver = webdriver.Chrome(
+            options=self.options,
+        )
 
     def login(self):
         self.driver.get(os.environ.get('DRIVER_GET_URL'))
         time.sleep(3)
-        page_input = None
 
         for data, ID in zip(self.account_info, self.page_IDs):
             page_input = self.driver.find_element(By.ID, ID)
@@ -42,32 +44,43 @@ class EwonAccount:
             page_input.send_keys(data)
         else:
             page_input.send_keys(Keys.ENTER)
+            self.save_cookies()
 
-    def get_cookies(self) -> dict:
+    def save_cookies(self):
         for cookie in self.driver.get_cookies():
             if cookie['name'] == 'm2websession':
-                return {
-                    'm2websession': cookie['value'],
-                }
+                 with open('cookies', 'w') as cookies:
+                    cookies.write(
+                        json.dumps({
+                            'm2websession': f'{cookie["value"]}'
+                            })
+                    )
 
-    def get_status(self) -> tuple:
-        response = requests.get(
+    def load_cookies(self):
+        try:
+            with open('cookies', 'r') as cookies:
+                return json.loads(cookies.read())
+        except:
+            return {}
+            
+    def get_response(self):
+        return requests.get(
             url=os.environ.get('REQUEST_URL'),
-            cookies=self.get_cookies(),
+            cookies=self.load_cookies()
         )
 
-        if response.status_code == 200:
-            vpn_status = json.loads(response.text)
-            if 'status' in vpn_status[0].keys():
-                return vpn_status[0]['name'], vpn_status[0]['status']
-        else:
-            raise Exception(f'Access denied {response.status_code}')
+    def get_vpn_status(self):
+        vpn_status = json.loads(self.get_response().text)
+        return vpn_status[0]['name'], vpn_status[0]['status']
 
 
 def inform_status(status: tuple):
 
     sender = os.environ.get('MAIL_SENDER')
-    receivers = [os.environ.get('MAIL_RECEIVER_ONE'), os.environ.get('MAIL_RECEIVER_TWO')]
+    receivers = [
+        os.environ.get('MAIL_RECEIVER_ONE'), 
+        os.environ.get('MAIL_RECEIVER_TWO')
+        ]
 
     message = f'From: From Ewon Status <{sender}>\n' \
               f'Subject: Ewon {status[0]} status has changed!\n\n' \
@@ -76,7 +89,7 @@ def inform_status(status: tuple):
     try:
         mail = smtplib.SMTP(
             host=os.environ.get('MAIL_HOST'),
-            port=587,
+            port=os.environ.get('MAIL_PORT'),
         )
 
         mail.login(
@@ -90,26 +103,32 @@ def inform_status(status: tuple):
 
 
 def main():
+
     VPN = EwonAccount([
         os.environ.get('ACCOUNT_VPN_FAB'),
         os.environ.get('ACCOUNT_VPN_FAB'),
         os.environ.get('ACCOUNT_VPN_PAS'),
     ])
-    status = None
 
     while True:
-        try:
-            if status is not None and status != VPN.get_status():
-                inform_status(VPN.get_status())
 
-            status = VPN.get_status()
-            print(f'[{datetime.now()}] {status[0]}: {status[1]}')
-            time.sleep(randint(111, 312))
+        match VPN.get_response().status_code:
+            case 200:
+                status = VPN.get_vpn_status()
+                print(f'[{datetime.now()}] {status[0]}: {status[1]}')
 
-        except Exception as e:
-            logging.exception(e)
-            VPN.login()
+                if status[1] != 'offline':
+                    inform_status(status)
+                    break
 
+            case 401:
+                print(f'Status code: 401\nTrying to login...')
+                VPN.login()
+                continue
+            case status:
+                print(f'Something went wrong...\nStatus code: {status}')
+
+        time.sleep(randint(111, 312))
 
 if __name__ == '__main__':
     main()
